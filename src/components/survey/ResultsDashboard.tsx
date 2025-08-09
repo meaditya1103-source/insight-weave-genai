@@ -26,19 +26,84 @@ interface ResultsDashboardProps {
 export const ResultsDashboard = ({ results }: ResultsDashboardProps) => {
   const { toast } = useToast();
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     toast({
       title: "Generating Report",
       description: "Your PDF report is being generated...",
     });
     
-    // Simulate PDF generation
-    setTimeout(() => {
+    try {
+      // Dynamic import to avoid bundle issues
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF();
+      
+      // Add title and header
+      doc.setFontSize(20);
+      doc.text('Survey Analysis Report', 20, 30);
+      
+      doc.setFontSize(12);
+      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 45);
+      
+      // Quality Score section
+      doc.setFontSize(16);
+      doc.text('Analysis Quality Score', 20, 65);
+      doc.setFontSize(12);
+      doc.text(`Overall Score: ${results.qualityScore}%`, 20, 80);
+      
+      // Estimated Parameters section
+      doc.setFontSize(16);
+      doc.text('Estimated Parameters', 20, 100);
+      
+      let yPosition = 115;
+      results.estimatedParameters.forEach((param, index) => {
+        doc.setFontSize(12);
+        doc.text(`${param.variable.toUpperCase()}`, 20, yPosition);
+        doc.text(`Estimate: ${param.estimate.toFixed(2)}%`, 30, yPosition + 10);
+        doc.text(`Margin of Error: ±${param.marginOfError.toFixed(2)}%`, 30, yPosition + 20);
+        doc.text(`95% CI: [${param.confidenceInterval[0].toFixed(2)}%, ${param.confidenceInterval[1].toFixed(2)}%]`, 30, yPosition + 30);
+        doc.text(`Sample Size: ${param.sampleSize.toLocaleString()}`, 30, yPosition + 40);
+        yPosition += 55;
+      });
+      
+      // AI Insights section
+      if (yPosition > 250) {
+        doc.addPage();
+        yPosition = 20;
+      }
+      
+      doc.setFontSize(16);
+      doc.text('AI-Generated Insights', 20, yPosition);
+      yPosition += 20;
+      
+      results.insights.forEach((insight, index) => {
+        if (yPosition > 250) {
+          doc.addPage();
+          yPosition = 20;
+        }
+        
+        doc.setFontSize(12);
+        doc.text(`${insight.category} (${insight.significance} impact)`, 20, yPosition);
+        
+        // Split long text into multiple lines
+        const lines = doc.splitTextToSize(insight.finding, 170);
+        doc.text(lines, 20, yPosition + 10);
+        yPosition += 10 + (lines.length * 5) + 10;
+      });
+      
+      // Save the PDF
+      doc.save('survey-analysis-report.pdf');
+      
       toast({
         title: "Report Ready",
-        description: "Your survey analysis report has been generated successfully.",
+        description: "Your survey analysis report has been downloaded successfully.",
       });
-    }, 2000);
+    } catch (error) {
+      toast({
+        title: "Generation Failed",
+        description: "There was an error generating the PDF report.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
