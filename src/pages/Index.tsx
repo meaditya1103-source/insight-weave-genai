@@ -12,49 +12,40 @@ const Index = () => {
   const [uploadedData, setUploadedData] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Mock results data
-  const mockResults = {
-    estimatedParameters: [
-      {
-        variable: 'customer satisfaction',
-        estimate: 73.5,
-        marginOfError: 2.8,
-        confidenceInterval: [70.7, 76.3] as [number, number],
-        sampleSize: 1200
-      },
-      {
-        variable: 'likelihood to recommend',
-        estimate: 68.2,
-        marginOfError: 3.1,
-        confidenceInterval: [65.1, 71.3] as [number, number],
-        sampleSize: 1180
-      },
-      {
-        variable: 'service quality rating',
-        estimate: 76.8,
-        marginOfError: 2.5,
-        confidenceInterval: [74.3, 79.3] as [number, number],
-        sampleSize: 1195
-      }
-    ],
-    insights: [
-      {
-        category: 'Customer Satisfaction Trends',
-        finding: 'Satisfaction levels show significant improvement in Q4, with 73.5% reporting positive experiences (+5.2% from previous quarter).',
-        significance: 'high' as const
-      },
-      {
-        category: 'Demographic Patterns',
-        finding: 'Younger demographics (18-34) show 15% higher satisfaction rates compared to older segments.',
-        significance: 'medium' as const
-      },
-      {
-        category: 'Service Quality Impact',
-        finding: 'Service quality rating is strongly correlated with overall satisfaction (r=0.78, p<0.001).',
-        significance: 'high' as const
-      }
-    ],
-    qualityScore: 89
+  // Generate real results from uploaded data
+  const generateResults = (data: any) => {
+    const numericVariables = data.variables.filter((v: any) => v.type === 'numeric');
+    
+    return {
+      estimatedParameters: numericVariables.map((variable: any) => ({
+        variable: variable.name,
+        estimate: variable.mean || 0,
+        marginOfError: variable.mean ? (variable.max - variable.min) / 10 : 0,
+        confidenceInterval: [
+          Math.max(0, (variable.mean || 0) - (variable.max - variable.min) / 10),
+          Math.min(100, (variable.mean || 0) + (variable.max - variable.min) / 10)
+        ] as [number, number],
+        sampleSize: data.totalRows - variable.missing
+      })),
+      insights: [
+        {
+          category: 'Data Quality Assessment',
+          finding: `Dataset contains ${data.totalRows} responses across ${data.totalColumns} variables with ${((data.missingValues / (data.totalRows * data.totalColumns)) * 100).toFixed(1)}% missing values.`,
+          significance: 'high' as const
+        },
+        {
+          category: 'Variable Distribution',
+          finding: `${data.variables.filter((v: any) => v.type === 'numeric').length} numeric and ${data.variables.filter((v: any) => v.type === 'categorical').length} categorical variables identified for analysis.`,
+          significance: 'medium' as const
+        },
+        {
+          category: 'Completeness Analysis',
+          finding: `${data.variables.filter((v: any) => v.missing === 0).length} variables have complete data, while ${data.variables.filter((v: any) => v.missing > 0).length} require imputation.`,
+          significance: data.variables.filter((v: any) => v.missing > 0).length > 0 ? 'medium' as const : 'low' as const
+        }
+      ],
+      qualityScore: Math.round(100 - (data.missingValues / (data.totalRows * data.totalColumns)) * 100)
+    };
   };
 
   const handleFileProcessed = (data: any) => {
@@ -167,7 +158,7 @@ const Index = () => {
                 </p>
               </div>
               
-              <ResultsDashboard results={mockResults} />
+              <ResultsDashboard results={generateResults(uploadedData)} />
             </div>
           )}
         </div>

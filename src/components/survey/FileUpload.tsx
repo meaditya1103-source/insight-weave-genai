@@ -63,15 +63,34 @@ export const FileUpload = ({ onFileProcessed, isProcessing }: FileUploadProps) =
             const totalRows = dataRows.length;
             const totalColumns = headers.length;
             
-            // Generate variable info based on actual headers
-            const variables = headers.map(header => ({
-              name: header,
-              type: (header.toLowerCase().includes('age') || 
-                     header.toLowerCase().includes('income') || 
-                     header.toLowerCase().includes('score') || 
-                     header.toLowerCase().includes('rating')) ? 'numeric' : 'categorical',
-              missing: Math.floor(Math.random() * totalRows * 0.05) // Simulate missing values (0-5%)
-            }));
+            // Parse data rows for actual analysis
+            const parsedData = dataRows.map(row => {
+              const values = row.split(',').map(v => v.trim().replace(/"/g, ''));
+              const rowObj: any = {};
+              headers.forEach((header, index) => {
+                rowObj[header] = values[index] || '';
+              });
+              return rowObj;
+            });
+
+            // Analyze variables based on actual data
+            const variables = headers.map(header => {
+              const values = parsedData.map(row => row[header]).filter(v => v && v !== '');
+              const numericValues = values.filter(v => !isNaN(Number(v)) && v !== '');
+              const isNumeric = numericValues.length > values.length * 0.8; // 80% numeric threshold
+              
+              const missing = totalRows - values.length;
+              
+              return {
+                name: header,
+                type: isNumeric ? 'numeric' : 'categorical',
+                missing,
+                uniqueValues: isNumeric ? null : [...new Set(values)].length,
+                mean: isNumeric ? (numericValues.reduce((sum, v) => sum + Number(v), 0) / numericValues.length) : null,
+                min: isNumeric ? Math.min(...numericValues.map(Number)) : null,
+                max: isNumeric ? Math.max(...numericValues.map(Number)) : null
+              };
+            });
             
             const missingValues = variables.reduce((sum, v) => sum + v.missing, 0);
             
@@ -80,7 +99,8 @@ export const FileUpload = ({ onFileProcessed, isProcessing }: FileUploadProps) =
               totalRows,
               totalColumns,
               missingValues,
-              variables
+              variables,
+              sampleData: parsedData.slice(0, 10) // First 10 records
             };
             
             onFileProcessed(mockData);
