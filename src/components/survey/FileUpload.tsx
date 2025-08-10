@@ -54,60 +54,126 @@ export const FileUpload = ({ onFileProcessed, isProcessing }: FileUploadProps) =
         const reader = new FileReader();
         reader.onload = (e) => {
           try {
-            const text = e.target?.result as string;
-            const lines = text.split('\n').filter(line => line.trim());
-            const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-            const dataRows = lines.slice(1);
+            const csvText = e.target?.result as string;
             
-            // Calculate actual statistics
-            const totalRows = dataRows.length;
-            const totalColumns = headers.length;
+            // Handle different encodings and clean the text
+            const cleanText = csvText
+              .replace(/^\uFEFF/, '') // Remove BOM
+              .replace(/\r\n/g, '\n')
+              .replace(/\r/g, '\n');
             
-            // Parse data rows for actual analysis
-            const parsedData = dataRows.map(row => {
-              const values = row.split(',').map(v => v.trim().replace(/"/g, ''));
-              const rowObj: any = {};
+            const lines = cleanText.trim().split('\n');
+            if (lines.length < 2) {
+              throw new Error('CSV file must have at least a header and one data row');
+            }
+
+            // Parse CSV properly handling quotes and commas
+            const parseCSVLine = (line: string): string[] => {
+              const result: string[] = [];
+              let current = '';
+              let inQuotes = false;
+              let i = 0;
+
+              while (i < line.length) {
+                const char = line[i];
+                
+                if (char === '"') {
+                  if (inQuotes && line[i + 1] === '"') {
+                    current += '"';
+                    i += 2;
+                  } else {
+                    inQuotes = !inQuotes;
+                    i++;
+                  }
+                } else if (char === ',' && !inQuotes) {
+                  result.push(current.trim());
+                  current = '';
+                  i++;
+                } else {
+                  current += char;
+                  i++;
+                }
+              }
+              
+              result.push(current.trim());
+              return result;
+            };
+
+            const headers = parseCSVLine(lines[0]);
+            const totalRows = lines.length - 1;
+            
+            // Parse all data for accurate statistics
+            const allData: any[] = [];
+            for (let i = 1; i < lines.length; i++) {
+              const values = parseCSVLine(lines[i]);
+              const row: any = {};
               headers.forEach((header, index) => {
-                rowObj[header] = values[index] || '';
+                row[header] = values[index] || '';
               });
-              return rowObj;
+              allData.push(row);
+            }
+
+            // Get sample data (first 10 records)
+            const sampleData = allData.slice(0, 10);
+
+            // Analyze variables with all data
+            const variables = headers.map(header => {
+              let missing = 0;
+              let numericCount = 0;
+              const values: any[] = [];
+              
+              allData.forEach(row => {
+                const value = row[header];
+                if (!value || value === '' || value === null || value === undefined) {
+                  missing++;
+                } else {
+                  values.push(value);
+                  if (!isNaN(Number(value)) && value !== '' && value !== null) {
+                    numericCount++;
+                  }
+                }
+              });
+
+              const isNumeric = numericCount > values.length * 0.5 && values.length > 0;
+              const uniqueValues = [...new Set(values.filter(v => v !== '' && v !== null))].length;
+
+              if (isNumeric) {
+                const numericValues = values.map(v => parseFloat(v)).filter(v => !isNaN(v));
+                return {
+                  name: header,
+                  type: 'numeric',
+                  missing,
+                  uniqueValues,
+                  mean: numericValues.length > 0 ? numericValues.reduce((a, b) => a + b, 0) / numericValues.length : 0,
+                  min: numericValues.length > 0 ? Math.min(...numericValues) : 0,
+                  max: numericValues.length > 0 ? Math.max(...numericValues) : 0
+                };
+              } else {
+                return {
+                  name: header,
+                  type: 'categorical',
+                  missing,
+                  uniqueValues
+                };
+              }
             });
 
-            // Analyze variables based on actual data
-            const variables = headers.map(header => {
-              const values = parsedData.map(row => row[header]).filter(v => v && v !== '');
-              const numericValues = values.filter(v => !isNaN(Number(v)) && v !== '');
-              const isNumeric = numericValues.length > values.length * 0.8; // 80% numeric threshold
-              
-              const missing = totalRows - values.length;
-              
-              return {
-                name: header,
-                type: isNumeric ? 'numeric' : 'categorical',
-                missing,
-                uniqueValues: isNumeric ? null : [...new Set(values)].length,
-                mean: isNumeric ? (numericValues.reduce((sum, v) => sum + Number(v), 0) / numericValues.length) : null,
-                min: isNumeric ? Math.min(...numericValues.map(Number)) : null,
-                max: isNumeric ? Math.max(...numericValues.map(Number)) : null
-              };
-            });
-            
-            const missingValues = variables.reduce((sum, v) => sum + v.missing, 0);
-            
-            const mockData = {
+            const totalMissing = variables.reduce((sum, v) => sum + v.missing, 0);
+
+            const processedData = {
               fileName: file.name,
               totalRows,
-              totalColumns,
-              missingValues,
+              totalColumns: headers.length,
+              missingValues: totalMissing,
               variables,
-              sampleData: parsedData.slice(0, 10) // First 10 records
+              sampleData
             };
             
-            onFileProcessed(mockData);
+            onFileProcessed(processedData);
             
             toast({
               title: "File processed successfully",
-              description: `${file.name} analyzed: ${totalRows} rows, ${totalColumns} columns`,
+              description: `${file.name} analyzed: ${processedData.totalRows} rows, ${processedData.totalColumns} columns`,
             });
           } catch (error) {
             toast({

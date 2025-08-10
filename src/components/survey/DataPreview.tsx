@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { BarChart3, Database, TrendingUp, AlertTriangle, Target } from 'lucide-react';
 
@@ -31,17 +31,6 @@ export const DataPreview = ({ data }: DataPreviewProps) => {
   const missingPercentage = (data.missingValues / (data.totalRows * data.totalColumns)) * 100;
   const dataQuality = missingPercentage < 5 ? 'Excellent' : missingPercentage < 15 ? 'Good' : 'Needs Attention';
 
-  const analysisGoals = [
-    { value: 'customer_satisfaction', label: 'Customer Satisfaction Analysis' },
-    { value: 'market_research', label: 'Market Research Insights' },
-    { value: 'employee_feedback', label: 'Employee Feedback Analysis' },
-    { value: 'product_feedback', label: 'Product Feedback Analysis' },
-    { value: 'brand_perception', label: 'Brand Perception Study' },
-    { value: 'demographic_analysis', label: 'Demographic Analysis' },
-    { value: 'behavioral_patterns', label: 'Behavioral Pattern Analysis' },
-    { value: 'general', label: 'General Statistical Analysis' }
-  ];
-
   return (
     <div className="space-y-6">
       {/* Analysis Goal Selection */}
@@ -51,24 +40,19 @@ export const DataPreview = ({ data }: DataPreviewProps) => {
             <Target className="h-5 w-5" />
             Analysis Goal
           </CardTitle>
-          <CardDescription>Select your primary analysis objective for customized insights</CardDescription>
+          <CardDescription>Describe your analysis objective for AI-powered customized insights</CardDescription>
         </CardHeader>
         <CardContent>
-          <Select value={analysisGoal} onValueChange={setAnalysisGoal}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Choose your analysis goal (optional)" />
-            </SelectTrigger>
-            <SelectContent>
-              {analysisGoals.map((goal) => (
-                <SelectItem key={goal.value} value={goal.value}>
-                  {goal.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Textarea
+            value={analysisGoal}
+            onChange={(e) => setAnalysisGoal(e.target.value)}
+            placeholder="Example: I want to analyze customer satisfaction trends by demographics and identify key drivers of satisfaction scores..."
+            className="min-h-[100px] resize-none"
+          />
           {analysisGoal && (
             <div className="mt-2 p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
-              Based on your goal, the analysis will focus on relevant visualizations and statistical tests.
+              <div className="font-medium mb-1">AI Analysis Focus:</div>
+              The system will tailor visualizations, statistical tests, and insights based on your specific goal using advanced LLMs to analyze patterns and relationships relevant to your objective.
             </div>
           )}
         </CardContent>
