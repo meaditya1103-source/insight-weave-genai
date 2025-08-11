@@ -18,8 +18,7 @@ const Index = () => {
     setCurrentStep('preview');
   };
 
-  const handleStartAnalysis = (goal?: string) => {
-    setAnalysisGoal(goal || '');
+  const handleStartAnalysis = () => {
     setCurrentStep('results');
   };
 
@@ -130,7 +129,7 @@ const Index = () => {
                 </p>
               </div>
               
-              <ResultsDashboard data={uploadedData} analysisGoal={analysisGoal} />
+              <ResultsDashboard data={uploadedData} />
             </div>
           )}
         </div>

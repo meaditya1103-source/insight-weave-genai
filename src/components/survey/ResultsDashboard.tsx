@@ -16,10 +16,9 @@ import { EnhancedInsights } from './EnhancedInsights';
 
 interface ResultsDashboardProps {
   data: any;
-  analysisGoal?: string;
 }
 
-export const ResultsDashboard = ({ data, analysisGoal }: ResultsDashboardProps) => {
+export const ResultsDashboard = ({ data }: ResultsDashboardProps) => {
   const { toast } = useToast();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGeneratingEstimates, setIsGeneratingEstimates] = useState(false);
@@ -32,10 +31,7 @@ export const ResultsDashboard = ({ data, analysisGoal }: ResultsDashboardProps) 
     try {
       const { data: result, error } = await supabase.functions.invoke('analyze-survey', {
         body: { 
-          data: {
-            ...data,
-            analysisGoal
-          }
+          data: data
         }
       });
 
@@ -65,10 +61,7 @@ export const ResultsDashboard = ({ data, analysisGoal }: ResultsDashboardProps) 
     try {
       const { data: result, error } = await supabase.functions.invoke('analyze-survey', {
         body: { 
-          data: {
-            ...data,
-            analysisGoal
-          },
+          data: data,
           parameters
         }
       });
@@ -276,13 +269,6 @@ export const ResultsDashboard = ({ data, analysisGoal }: ResultsDashboardProps) 
               Download Report
             </Button>
           </div>
-          
-          {analysisGoal && (
-            <div className="mt-4 p-3 bg-white/50 rounded-lg border">
-              <div className="text-sm font-medium text-blue-700 mb-1">Analysis Goal:</div>
-              <div className="text-sm text-blue-600">{analysisGoal}</div>
-            </div>
-          )}
         </CardContent>
       </Card>
 

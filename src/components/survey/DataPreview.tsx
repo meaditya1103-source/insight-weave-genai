@@ -21,58 +21,26 @@ interface DataPreviewProps {
       mean?: number;
       min?: number;
       max?: number;
+      values?: any[];
     }>;
     sampleData: Array<any>;
   };
-  onStartAnalysis: (goal?: string) => void;
+  onStartAnalysis: () => void;
 }
 
 export const DataPreview = ({ data, onStartAnalysis }: DataPreviewProps) => {
-  const [analysisGoal, setAnalysisGoal] = useState<string>('');
-  
   const missingPercentage = (data.missingValues / (data.totalRows * data.totalColumns)) * 100;
   const dataQuality = missingPercentage < 5 ? 'Excellent' : missingPercentage < 15 ? 'Good' : 'Needs Attention';
 
-  const handleStartAnalysis = () => {
-    onStartAnalysis(analysisGoal);
-  };
-
   return (
     <div className="space-y-6">
-      {/* Analysis Goal Section */}
-      <Card className="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-purple-800">
-            <Target className="h-5 w-5" />
-            AI Analysis Goal (Optional)
-          </CardTitle>
-          <CardDescription className="text-purple-600">
-            Describe your analysis objective for AI-powered customized insights and recommendations
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Textarea
-            value={analysisGoal}
-            onChange={(e) => setAnalysisGoal(e.target.value)}
-            placeholder="Example: Analyze customer satisfaction trends by demographics and identify key drivers of satisfaction scores. Focus on relationships between satisfaction ratings and customer characteristics like age, income, and purchase history..."
-            className="min-h-[120px] resize-none border-purple-200 focus:border-purple-400"
-          />
-          {analysisGoal && (
-            <div className="mt-3 p-4 bg-white/50 rounded-lg border border-purple-200">
-              <div className="flex items-start gap-3">
-                <Zap className="h-5 w-5 text-purple-600 mt-0.5" />
-                <div className="text-sm text-purple-700">
-                  <div className="font-medium mb-1">AI Analysis Focus:</div>
-                  The system will tailor statistical tests, visualizations, parameter estimations, and insights based on your specific goal using advanced machine learning algorithms to analyze patterns and relationships most relevant to your objective.
-                </div>
-              </div>
-            </div>
-          )}
-          
+      {/* Quick Analysis Button */}
+      <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
+        <CardContent className="p-6">
           <Button 
-            onClick={handleStartAnalysis}
+            onClick={onStartAnalysis}
             size="lg"
-            className="w-full mt-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
           >
             <ArrowRight className="h-5 w-5 mr-2" />
             Start AI-Powered Analysis
@@ -168,39 +136,55 @@ export const DataPreview = ({ data, onStartAnalysis }: DataPreviewProps) => {
           <CardDescription className="text-blue-600">Overview of variable types and characteristics</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-3">
-              <h4 className="font-medium text-blue-800">Numeric Variables ({data.variables.filter(v => v.type === 'numeric').length})</h4>
-              {data.variables.filter(v => v.type === 'numeric').slice(0, 5).map((variable, index) => (
-                <div key={index} className="flex items-center justify-between p-2 bg-blue-50 rounded">
-                  <span className="text-sm font-medium">{variable.name}</span>
-                  <div className="text-xs text-blue-600">
-                    {variable.mean ? `μ = ${variable.mean.toFixed(2)}` : 'No data'}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Numeric Variables Section */}
+            <div className="space-y-4">
+              <h4 className="font-semibold text-blue-800 border-b border-blue-200 pb-2">
+                Numeric Variables ({data.variables.filter(v => v.type === 'numeric').length})
+              </h4>
+              <div className="space-y-3">
+                {data.variables.filter(v => v.type === 'numeric').slice(0, 5).map((variable, index) => (
+                  <div key={index} className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="font-medium text-blue-900 mb-2">{variable.name}</div>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-blue-700">
+                      <div>Mean: {variable.mean ? variable.mean.toFixed(2) : 'N/A'}</div>
+                      <div>Min: {variable.min !== undefined ? variable.min.toFixed(2) : 'N/A'}</div>
+                      <div>Max: {variable.max !== undefined ? variable.max.toFixed(2) : 'N/A'}</div>
+                      <div>Missing: {variable.missing || 0}</div>
+                    </div>
                   </div>
-                </div>
-              ))}
-              {data.variables.filter(v => v.type === 'numeric').length > 5 && (
-                <div className="text-xs text-blue-600">
-                  +{data.variables.filter(v => v.type === 'numeric').length - 5} more variables...
-                </div>
-              )}
+                ))}
+                {data.variables.filter(v => v.type === 'numeric').length > 5 && (
+                  <div className="text-sm text-blue-600 text-center py-2">
+                    +{data.variables.filter(v => v.type === 'numeric').length - 5} more numeric variables...
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="space-y-3">
-              <h4 className="font-medium text-purple-800">Categorical Variables ({data.variables.filter(v => v.type === 'categorical').length})</h4>
-              {data.variables.filter(v => v.type === 'categorical').slice(0, 5).map((variable, index) => (
-                <div key={index} className="flex items-center justify-between p-2 bg-purple-50 rounded">
-                  <span className="text-sm font-medium">{variable.name}</span>
-                  <div className="text-xs text-purple-600">
-                    {variable.uniqueValues} unique values
+            {/* Categorical Variables Section */}
+            <div className="space-y-4">
+              <h4 className="font-semibold text-purple-800 border-b border-purple-200 pb-2">
+                Categorical Variables ({data.variables.filter(v => v.type === 'categorical').length})
+              </h4>
+              <div className="space-y-3">
+                {data.variables.filter(v => v.type === 'categorical').slice(0, 5).map((variable, index) => (
+                  <div key={index} className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                    <div className="font-medium text-purple-900 mb-2">{variable.name}</div>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-purple-700">
+                      <div>Unique: {variable.uniqueValues || 0}</div>
+                      <div>Count: {variable.values?.length || 0}</div>
+                      <div>Missing: {variable.missing || 0}</div>
+                      <div>Type: Categorical</div>
+                    </div>
                   </div>
-                </div>
-              ))}
-              {data.variables.filter(v => v.type === 'categorical').length > 5 && (
-                <div className="text-xs text-purple-600">
-                  +{data.variables.filter(v => v.type === 'categorical').length - 5} more variables...
-                </div>
-              )}
+                ))}
+                {data.variables.filter(v => v.type === 'categorical').length > 5 && (
+                  <div className="text-sm text-purple-600 text-center py-2">
+                    +{data.variables.filter(v => v.type === 'categorical').length - 5} more categorical variables...
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
