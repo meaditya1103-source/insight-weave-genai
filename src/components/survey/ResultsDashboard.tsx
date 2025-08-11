@@ -1,101 +1,195 @@
+
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Download, FileText, BarChart3, Target, Zap } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Download, FileText, BarChart3, Target, Zap, Calculator } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+
+import { ParameterEstimationSetup } from './ParameterEstimationSetup';
+import { StatisticalAnalysis } from './StatisticalAnalysis';
+import { EstimatesTable } from './EstimatesTable';
+import { EnhancedInsights } from './EnhancedInsights';
 
 interface ResultsDashboardProps {
-  results: {
-    estimatedParameters: Array<{
-      variable: string;
-      estimate: number;
-      marginOfError: number;
-      confidenceInterval: [number, number];
-      sampleSize: number;
-    }>;
-    insights: Array<{
-      category: string;
-      finding: string;
-      significance: 'high' | 'medium' | 'low';
-    }>;
-    qualityScore: number;
-  };
+  data: any;
+  analysisGoal?: string;
 }
 
-export const ResultsDashboard = ({ results }: ResultsDashboardProps) => {
+export const ResultsDashboard = ({ data, analysisGoal }: ResultsDashboardProps) => {
   const { toast } = useToast();
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isGeneratingEstimates, setIsGeneratingEstimates] = useState(false);
+  const [analysisResults, setAnalysisResults] = useState<any>(null);
+  const [parameterEstimates, setParameterEstimates] = useState<any[]>([]);
+
+  const performAnalysis = async () => {
+    setIsAnalyzing(true);
+    
+    try {
+      const { data: result, error } = await supabase.functions.invoke('analyze-survey', {
+        body: { 
+          data: {
+            ...data,
+            analysisGoal
+          }
+        }
+      });
+
+      if (error) throw error;
+
+      setAnalysisResults(result);
+      
+      toast({
+        title: "Analysis Complete",
+        description: "AI-powered statistical analysis has been completed successfully.",
+      });
+    } catch (error) {
+      console.error('Analysis error:', error);
+      toast({
+        title: "Analysis Failed",
+        description: "There was an error performing the analysis. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const generateEstimates = async (parameters: any[]) => {
+    setIsGeneratingEstimates(true);
+    
+    try {
+      const { data: result, error } = await supabase.functions.invoke('analyze-survey', {
+        body: { 
+          data: {
+            ...data,
+            analysisGoal
+          },
+          parameters
+        }
+      });
+
+      if (error) throw error;
+
+      setParameterEstimates(result.parameterEstimates || []);
+      
+      toast({
+        title: "Estimates Generated",
+        description: `Successfully generated ${result.parameterEstimates?.length || 0} parameter estimates.`,
+      });
+    } catch (error) {
+      console.error('Estimation error:', error);
+      toast({
+        title: "Estimation Failed",
+        description: "There was an error generating parameter estimates. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingEstimates(false);
+    }
+  };
 
   const handleDownloadPDF = async () => {
     toast({
       title: "Generating Report",
-      description: "Your PDF report is being generated...",
+      description: "Your comprehensive PDF report is being generated...",
     });
     
     try {
-      // Dynamic import to avoid bundle issues
       const { jsPDF } = await import('jspdf');
       const doc = new jsPDF();
       
-      // Add title and header
-      doc.setFontSize(20);
+      // Header
+      doc.setFontSize(24);
       doc.text('Survey Analysis Report', 20, 30);
       
       doc.setFontSize(12);
       doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 45);
+      doc.text(`Dataset: ${data.fileName}`, 20, 55);
       
-      // Quality Score section
-      doc.setFontSize(16);
-      doc.text('Analysis Quality Score', 20, 65);
-      doc.setFontSize(12);
-      doc.text(`Overall Score: ${results.qualityScore}%`, 20, 80);
-      
-      // Estimated Parameters section
-      doc.setFontSize(16);
-      doc.text('Estimated Parameters', 20, 100);
-      
-      let yPosition = 115;
-      results.estimatedParameters.forEach((param, index) => {
+      // Executive Summary
+      if (analysisResults?.executiveSummary) {
+        doc.setFontSize(16);
+        doc.text('Executive Summary', 20, 75);
         doc.setFontSize(12);
-        doc.text(`${param.variable.toUpperCase()}`, 20, yPosition);
-        doc.text(`Estimate: ${param.estimate.toFixed(2)}%`, 30, yPosition + 10);
-        doc.text(`Margin of Error: ±${param.marginOfError.toFixed(2)}%`, 30, yPosition + 20);
-        doc.text(`95% CI: [${param.confidenceInterval[0].toFixed(2)}%, ${param.confidenceInterval[1].toFixed(2)}%]`, 30, yPosition + 30);
-        doc.text(`Sample Size: ${param.sampleSize.toLocaleString()}`, 30, yPosition + 40);
-        yPosition += 55;
-      });
-      
-      // AI Insights section
-      if (yPosition > 250) {
-        doc.addPage();
-        yPosition = 20;
+        doc.text(analysisResults.executiveSummary.overview, 20, 90);
+        
+        let yPos = 105;
+        analysisResults.executiveSummary.keyFindings.forEach((finding: string, index: number) => {
+          const lines = doc.splitTextToSize(`• ${finding}`, 170);
+          doc.text(lines, 20, yPos);
+          yPos += lines.length * 5 + 5;
+        });
       }
       
-      doc.setFontSize(16);
-      doc.text('AI-Generated Insights', 20, yPosition);
-      yPosition += 20;
-      
-      results.insights.forEach((insight, index) => {
-        if (yPosition > 250) {
-          doc.addPage();
-          yPosition = 20;
-        }
-        
+      // Quality Score
+      if (analysisResults?.qualityScore) {
+        doc.addPage();
+        doc.setFontSize(16);
+        doc.text('Data Quality Assessment', 20, 30);
         doc.setFontSize(12);
-        doc.text(`${insight.category} (${insight.significance} impact)`, 20, yPosition);
-        
-        // Split long text into multiple lines
-        const lines = doc.splitTextToSize(insight.finding, 170);
-        doc.text(lines, 20, yPosition + 10);
-        yPosition += 10 + (lines.length * 5) + 10;
-      });
+        doc.text(`Overall Quality Score: ${analysisResults.qualityScore}%`, 20, 45);
+      }
       
-      // Save the PDF
-      doc.save('survey-analysis-report.pdf');
+      // Parameter Estimates
+      if (parameterEstimates.length > 0) {
+        doc.addPage();
+        doc.setFontSize(16);
+        doc.text('Parameter Estimates', 20, 30);
+        
+        let yPos = 45;
+        parameterEstimates.forEach((estimate, index) => {
+          if (yPos > 250) {
+            doc.addPage();
+            yPos = 20;
+          }
+          
+          doc.setFontSize(14);
+          doc.text(`${estimate.estimatingParameter} (${estimate.aggregationType})`, 20, yPos);
+          yPos += 15;
+          
+          estimate.groups.forEach((group: any) => {
+            doc.setFontSize(10);
+            doc.text(`${group.group}: ${group.estimate.toFixed(2)} ± ${group.marginOfError.toFixed(2)}`, 30, yPos);
+            yPos += 10;
+          });
+          yPos += 10;
+        });
+      }
+      
+      // AI Insights
+      if (analysisResults?.insights?.length > 0) {
+        doc.addPage();
+        doc.setFontSize(16);
+        doc.text('AI-Generated Insights', 20, 30);
+        
+        let yPos = 45;
+        analysisResults.insights.forEach((insight: any, index: number) => {
+          if (yPos > 250) {
+            doc.addPage();
+            yPos = 20;
+          }
+          
+          doc.setFontSize(12);
+          doc.text(`${insight.category}`, 20, yPos);
+          yPos += 10;
+          
+          const lines = doc.splitTextToSize(insight.finding, 170);
+          doc.setFontSize(10);
+          doc.text(lines, 20, yPos);
+          yPos += lines.length * 5 + 15;
+        });
+      }
+      
+      doc.save('comprehensive-survey-analysis-report.pdf');
       
       toast({
         title: "Report Ready",
-        description: "Your survey analysis report has been downloaded successfully.",
+        description: "Your comprehensive survey analysis report has been downloaded successfully.",
       });
     } catch (error) {
       toast({
@@ -106,149 +200,186 @@ export const ResultsDashboard = ({ results }: ResultsDashboardProps) => {
     }
   };
 
+  const exportEstimates = () => {
+    if (parameterEstimates.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No parameter estimates to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const csvContent = [
+      ['Parameter', 'Group', 'Aggregation', 'Estimate', 'Margin of Error', '95% CI Lower', '95% CI Upper', 'Sample Size', 'Weighted N'].join(','),
+      ...parameterEstimates.flatMap(estimate =>
+        estimate.groups.map((group: any) => [
+          estimate.estimatingParameter,
+          group.group,
+          estimate.aggregationType,
+          group.estimate.toFixed(4),
+          group.marginOfError.toFixed(4),
+          group.confidenceInterval[0].toFixed(4),
+          group.confidenceInterval[1].toFixed(4),
+          group.sampleSize,
+          group.weightedN.toFixed(0)
+        ].join(','))
+      )
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'parameter-estimates.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Export Complete",
+      description: "Parameter estimates have been exported to CSV.",
+    });
+  };
+
   return (
     <div className="space-y-6">
-      {/* Quality Score */}
-      <Card>
+      {/* Analysis Control Panel */}
+      <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="h-5 w-5" />
-            Analysis Quality Score
+          <CardTitle className="flex items-center gap-2 text-blue-800">
+            <Calculator className="h-5 w-5" />
+            AI-Powered Analysis Control
           </CardTitle>
-          <CardDescription>Overall confidence in the statistical estimates</CardDescription>
+          <CardDescription className="text-blue-600">
+            Perform comprehensive statistical analysis with machine learning insights
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-4">
-            <div className="flex-1">
-              <Progress value={results.qualityScore} className="h-4" />
-            </div>
-            <div className="text-2xl font-bold text-primary">{results.qualityScore}%</div>
-          </div>
-          <div className="mt-4 grid grid-cols-3 gap-4 text-center">
-            <div>
-              <div className="text-sm text-muted-foreground">Sample Size</div>
-              <div className="font-semibold">Adequate</div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground">Data Quality</div>
-              <div className="font-semibold">High</div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground">Weights Applied</div>
-              <div className="font-semibold">Yes</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Key Parameters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
-            Estimated Parameters
-          </CardTitle>
-          <CardDescription>Statistical estimates with margins of error</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {results.estimatedParameters.map((param, index) => (
-              <div key={index} className="p-4 border rounded-lg">
-                <div className="flex items-start justify-between mb-2">
-                  <h4 className="font-medium capitalize">{param.variable}</h4>
-                  <Badge variant="outline">n = {param.sampleSize.toLocaleString()}</Badge>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <div className="text-muted-foreground">Estimate</div>
-                    <div className="text-lg font-semibold text-primary">
-                      {param.estimate.toFixed(2)}%
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-muted-foreground">Margin of Error</div>
-                    <div className="text-lg font-semibold">
-                      ±{param.marginOfError.toFixed(2)}%
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-muted-foreground">95% CI</div>
-                    <div className="text-sm">
-                      [{param.confidenceInterval[0].toFixed(2)}%, {param.confidenceInterval[1].toFixed(2)}%]
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* AI Insights */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5" />
-            AI-Generated Insights
-          </CardTitle>
-          <CardDescription>Key findings and patterns identified in your data</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {results.insights.map((insight, index) => (
-              <div key={index} className="p-4 border rounded-lg">
-                <div className="flex items-start gap-3">
-                  <Badge 
-                    variant={
-                      insight.significance === 'high' ? 'default' : 
-                      insight.significance === 'medium' ? 'secondary' : 'outline'
-                    }
-                    className="mt-1"
-                  >
-                    {insight.significance} impact
-                  </Badge>
-                  <div className="flex-1">
-                    <h4 className="font-medium mb-1">{insight.category}</h4>
-                    <p className="text-sm text-muted-foreground">{insight.finding}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Download Report */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Generate Report
-          </CardTitle>
-          <CardDescription>Download comprehensive analysis in PDF format</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="p-4 bg-muted/50 rounded-lg">
-              <h4 className="font-medium mb-2">Report includes:</h4>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• Executive summary with key findings</li>
-                <li>• Detailed statistical analysis</li>
-                <li>• Data quality assessment</li>
-                <li>• Methodology documentation</li>
-                <li>• Visualizations and charts</li>
-                <li>• AI-generated insights and recommendations</li>
-              </ul>
-            </div>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Button 
+              onClick={performAnalysis}
+              disabled={isAnalyzing}
+              size="lg"
+              className="flex-1 bg-blue-600 hover:bg-blue-700"
+            >
+              {isAnalyzing ? 'Analyzing...' : 'Start AI Analysis'}
+            </Button>
             
-            <Button onClick={handleDownloadPDF} className="w-full" size="lg">
+            <Button 
+              onClick={handleDownloadPDF}
+              variant="outline"
+              size="lg"
+              disabled={!analysisResults}
+              className="flex-1"
+            >
               <Download className="mr-2 h-4 w-4" />
-              Download PDF Report
+              Download Report
             </Button>
           </div>
+          
+          {analysisGoal && (
+            <div className="mt-4 p-3 bg-white/50 rounded-lg border">
+              <div className="text-sm font-medium text-blue-700 mb-1">Analysis Goal:</div>
+              <div className="text-sm text-blue-600">{analysisGoal}</div>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Analysis Results Tabs */}
+      {analysisResults && (
+        <Tabs defaultValue="overview" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-5">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="statistics">Statistics</TabsTrigger>
+            <TabsTrigger value="parameters">Parameters</TabsTrigger>
+            <TabsTrigger value="insights">AI Insights</TabsTrigger>
+            <TabsTrigger value="estimates">Estimates</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="space-y-6">
+            {/* Quality Score */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="h-5 w-5" />
+                  Analysis Quality Score
+                </CardTitle>
+                <CardDescription>Overall confidence in the statistical estimates</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <Progress value={analysisResults.qualityScore} className="h-6" />
+                  </div>
+                  <div className="text-3xl font-bold text-primary">{analysisResults.qualityScore}%</div>
+                </div>
+                
+                {/* Executive Summary */}
+                {analysisResults.executiveSummary && (
+                  <div className="mt-6 space-y-4">
+                    <h3 className="font-semibold text-lg">Executive Summary</h3>
+                    <p className="text-muted-foreground">{analysisResults.executiveSummary.overview}</p>
+                    
+                    <div>
+                      <h4 className="font-medium mb-2">Key Findings:</h4>
+                      <ul className="space-y-1">
+                        {analysisResults.executiveSummary.keyFindings.map((finding: string, index: number) => (
+                          <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
+                            <span className="text-primary">•</span>
+                            {finding}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="statistics">
+            <StatisticalAnalysis 
+              analysis={analysisResults.statisticalAnalysis} 
+              visualizations={analysisResults.visualizations}
+            />
+          </TabsContent>
+
+          <TabsContent value="parameters">
+            <ParameterEstimationSetup
+              variables={data.variables}
+              onGenerateEstimates={generateEstimates}
+              isGenerating={isGeneratingEstimates}
+            />
+          </TabsContent>
+
+          <TabsContent value="insights">
+            <EnhancedInsights insights={analysisResults.insights || []} />
+          </TabsContent>
+
+          <TabsContent value="estimates">
+            <EstimatesTable 
+              estimates={parameterEstimates}
+              onExportEstimates={exportEstimates}
+            />
+          </TabsContent>
+        </Tabs>
+      )}
+
+      {!analysisResults && (
+        <Card className="text-center py-12">
+          <CardContent>
+            <BarChart3 className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <h3 className="text-lg font-semibold mb-2">Ready for AI Analysis</h3>
+            <p className="text-muted-foreground mb-4">
+              Click "Start AI Analysis" to perform comprehensive statistical analysis with machine learning insights.
+            </p>
+            <Badge variant="outline" className="px-4 py-2">
+              {data.totalRows.toLocaleString()} responses • {data.variables.length} variables
+            </Badge>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
