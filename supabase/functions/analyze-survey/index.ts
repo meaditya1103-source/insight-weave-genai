@@ -42,7 +42,11 @@ serve(async (req) => {
   try {
     const { data, parameters }: { data: SurveyData; parameters?: any[] } = await req.json();
     
-    console.log('Analyzing survey data with', data.variables.length, 'variables');
+    console.log('Analyzing survey data with', data?.variables?.length || 0, 'variables');
+    
+    if (!data || !data.variables || !Array.isArray(data.variables)) {
+      throw new Error('Invalid data structure: missing or invalid variables array');
+    }
     
     // Perform comprehensive statistical analysis
     const statisticalAnalysis = performStatisticalAnalysis(data);
@@ -59,12 +63,16 @@ serve(async (req) => {
       executiveSummary: generateExecutiveSummary(data, statisticalAnalysis, insights)
     };
 
+    console.log('Analysis completed successfully');
     return new Response(JSON.stringify(results), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
     console.error('Error in analyze-survey function:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: error.message || 'Unknown error occurred',
+      details: 'Check the edge function logs for more information'
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -341,18 +349,26 @@ function calculateStandardDeviation(values: number[]): number {
 }
 
 function calculateSkewness(values: number[]): number {
+  if (values.length < 3) return 0;
+  
   const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
   const std = calculateStandardDeviation(values);
   const n = values.length;
+  
+  if (std === 0) return 0;
   
   const skewnessSum = values.reduce((sum, val) => sum + Math.pow((val - mean) / std, 3), 0);
   return (n / ((n - 1) * (n - 2))) * skewnessSum;
 }
 
 function calculateKurtosis(values: number[]): number {
+  if (values.length < 4) return 0;
+  
   const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
   const std = calculateStandardDeviation(values);
   const n = values.length;
+  
+  if (std === 0) return 0;
   
   const kurtosisSum = values.reduce((sum, val) => sum + Math.pow((val - mean) / std, 4), 0);
   return (n * (n + 1) / ((n - 1) * (n - 2) * (n - 3))) * kurtosisSum - (3 * Math.pow(n - 1, 2) / ((n - 2) * (n - 3)));

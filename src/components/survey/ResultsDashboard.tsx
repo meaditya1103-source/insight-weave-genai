@@ -29,25 +29,48 @@ export const ResultsDashboard = ({ data }: ResultsDashboardProps) => {
     setIsAnalyzing(true);
     
     try {
+      // Prepare data with proper structure for the edge function
+      const analysisData = {
+        variables: data.variables.map((variable: any) => ({
+          name: variable.name,
+          type: variable.type,
+          values: variable.values || [],
+          missing: variable.missing || 0
+        })),
+        sampleData: data.sampleData || [],
+        totalRows: data.totalRows || 0,
+        fileName: data.fileName
+      };
+
+      console.log('Sending analysis request with data:', analysisData);
+
       const { data: result, error } = await supabase.functions.invoke('analyze-survey', {
         body: { 
-          data: data
+          data: analysisData
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw error;
+      }
 
+      if (!result) {
+        throw new Error('No result returned from analysis function');
+      }
+
+      console.log('Analysis result received:', result);
       setAnalysisResults(result);
       
       toast({
         title: "Analysis Complete",
         description: "AI-powered statistical analysis has been completed successfully.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Analysis error:', error);
       toast({
         title: "Analysis Failed",
-        description: "There was an error performing the analysis. Please try again.",
+        description: error.message || "There was an error performing the analysis. Please try again.",
         variant: "destructive",
       });
     } finally {

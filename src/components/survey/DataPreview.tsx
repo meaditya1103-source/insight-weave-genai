@@ -143,22 +143,34 @@ export const DataPreview = ({ data, onStartAnalysis }: DataPreviewProps) => {
                 Numeric Variables ({data.variables.filter(v => v.type === 'numeric').length})
               </h4>
               <div className="space-y-3">
-                {data.variables.filter(v => v.type === 'numeric').slice(0, 5).map((variable, index) => (
-                  <div key={index} className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                    <div className="font-medium text-blue-900 mb-2">{variable.name}</div>
-                    <div className="grid grid-cols-2 gap-2 text-xs text-blue-700">
-                      <div>Mean: {variable.mean ? variable.mean.toFixed(2) : 'N/A'}</div>
-                      <div>Min: {variable.min !== undefined ? variable.min.toFixed(2) : 'N/A'}</div>
-                      <div>Max: {variable.max !== undefined ? variable.max.toFixed(2) : 'N/A'}</div>
-                      <div>Missing: {variable.missing || 0}</div>
+                {data.variables.filter(v => v.type === 'numeric').map((variable, index) => {
+                  // Calculate proper statistics for numeric variables
+                  const numericValues = variable.values?.filter(v => v !== null && v !== undefined && v !== '' && !isNaN(parseFloat(v))).map(v => parseFloat(v)) || [];
+                  const mean = numericValues.length > 0 ? numericValues.reduce((sum, val) => sum + val, 0) / numericValues.length : 0;
+                  const sortedValues = [...numericValues].sort((a, b) => a - b);
+                  const median = sortedValues.length > 0 ? (sortedValues.length % 2 === 0 ? (sortedValues[sortedValues.length/2-1] + sortedValues[sortedValues.length/2]) / 2 : sortedValues[Math.floor(sortedValues.length/2)]) : 0;
+                  const q1 = sortedValues.length > 0 ? sortedValues[Math.floor(sortedValues.length * 0.25)] : 0;
+                  const q3 = sortedValues.length > 0 ? sortedValues[Math.floor(sortedValues.length * 0.75)] : 0;
+                  const min = sortedValues.length > 0 ? Math.min(...sortedValues) : 0;
+                  const max = sortedValues.length > 0 ? Math.max(...sortedValues) : 0;
+                  
+                  return (
+                    <div key={index} className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="font-medium text-blue-900 mb-2">{variable.name}</div>
+                      <div className="grid grid-cols-3 gap-2 text-xs text-blue-700">
+                        <div>Mean: {mean.toFixed(2)}</div>
+                        <div>Median: {median.toFixed(2)}</div>
+                        <div>Min: {min.toFixed(2)}</div>
+                        <div>Max: {max.toFixed(2)}</div>
+                        <div>Q1: {q1.toFixed(2)}</div>
+                        <div>Q3: {q3.toFixed(2)}</div>
+                        <div>Count: {numericValues.length}</div>
+                        <div>Missing: {variable.missing || 0}</div>
+                        <div>Std Dev: {numericValues.length > 1 ? Math.sqrt(numericValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / numericValues.length).toFixed(2) : '0.00'}</div>
+                      </div>
                     </div>
-                  </div>
-                ))}
-                {data.variables.filter(v => v.type === 'numeric').length > 5 && (
-                  <div className="text-sm text-blue-600 text-center py-2">
-                    +{data.variables.filter(v => v.type === 'numeric').length - 5} more numeric variables...
-                  </div>
-                )}
+                  );
+                })}
               </div>
             </div>
 
@@ -168,22 +180,40 @@ export const DataPreview = ({ data, onStartAnalysis }: DataPreviewProps) => {
                 Categorical Variables ({data.variables.filter(v => v.type === 'categorical').length})
               </h4>
               <div className="space-y-3">
-                {data.variables.filter(v => v.type === 'categorical').slice(0, 5).map((variable, index) => (
-                  <div key={index} className="p-3 bg-purple-50 rounded-lg border border-purple-200">
-                    <div className="font-medium text-purple-900 mb-2">{variable.name}</div>
-                    <div className="grid grid-cols-2 gap-2 text-xs text-purple-700">
-                      <div>Unique: {variable.uniqueValues || 0}</div>
-                      <div>Count: {variable.values?.length || 0}</div>
-                      <div>Missing: {variable.missing || 0}</div>
-                      <div>Type: Categorical</div>
+                {data.variables.filter(v => v.type === 'categorical').map((variable, index) => {
+                  // Calculate proper statistics for categorical variables
+                  const validValues = variable.values?.filter(v => v !== null && v !== undefined && v !== '') || [];
+                  const valueCounts: { [key: string]: number } = {};
+                  validValues.forEach(val => {
+                    const key = String(val);
+                    valueCounts[key] = (valueCounts[key] || 0) + 1;
+                  });
+                  const sortedCounts = Object.entries(valueCounts).sort((a, b) => b[1] - a[1]);
+                  const mode = sortedCounts[0]?.[0] || 'N/A';
+                  const modeCount = sortedCounts[0]?.[1] || 0;
+                  const uniqueCount = Object.keys(valueCounts).length;
+                  
+                  return (
+                    <div key={index} className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                      <div className="font-medium text-purple-900 mb-2">{variable.name}</div>
+                      <div className="grid grid-cols-2 gap-2 text-xs text-purple-700 mb-2">
+                        <div>Count: {validValues.length}</div>
+                        <div>Unique: {uniqueCount}</div>
+                        <div>Missing: {variable.missing || 0}</div>
+                        <div>Mode: {mode}</div>
+                      </div>
+                      <div className="text-xs text-purple-600">
+                        <div className="font-medium mb-1">Top Values:</div>
+                        {sortedCounts.slice(0, 3).map(([value, count], idx) => (
+                          <div key={idx} className="flex justify-between">
+                            <span>{value}:</span>
+                            <span>{count} ({((count / validValues.length) * 100).toFixed(1)}%)</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
-                {data.variables.filter(v => v.type === 'categorical').length > 5 && (
-                  <div className="text-sm text-purple-600 text-center py-2">
-                    +{data.variables.filter(v => v.type === 'categorical').length - 5} more categorical variables...
-                  </div>
-                )}
+                  );
+                })}
               </div>
             </div>
           </div>
