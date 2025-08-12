@@ -37,7 +37,7 @@ export const ParameterEstimationSetup = ({
     estimatingParameter: '',
     baseParameter: 'None',
     aggregationType: '',
-    weightVariable: ''
+    weightVariable: 'none'
   });
 
   const numericVariables = variables.filter(v => v.type === 'numeric');
@@ -83,7 +83,7 @@ export const ParameterEstimationSetup = ({
       estimatingParameter: currentParameter.estimatingParameter,
       baseParameter: currentParameter.baseParameter,
       aggregationType: currentParameter.aggregationType,
-      weightVariable: currentParameter.weightVariable || undefined
+      weightVariable: currentParameter.weightVariable !== 'none' ? currentParameter.weightVariable : undefined
     };
 
     setParameterLogs([...parameterLogs, newLog]);
@@ -91,7 +91,7 @@ export const ParameterEstimationSetup = ({
       estimatingParameter: '',
       baseParameter: 'None',
       aggregationType: '',
-      weightVariable: ''
+      weightVariable: 'none'
     });
 
     toast({
@@ -208,7 +208,7 @@ export const ParameterEstimationSetup = ({
                 <SelectValue placeholder="Select weights" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None (Equal weights)</SelectItem>
+                <SelectItem value="none">None (Equal weights)</SelectItem>
                 {numericVariables.map(variable => (
                   <SelectItem key={variable.name} value={variable.name}>
                     {variable.name}

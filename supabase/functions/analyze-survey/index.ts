@@ -136,7 +136,7 @@ function computeParameterEstimates(data: SurveyData, parameters: any[]): Paramet
     const estimatingVar = data.variables.find(v => v.name === param.estimatingParameter);
     const baseVar = param.baseParameter !== 'None' ? 
       data.variables.find(v => v.name === param.baseParameter) : null;
-    const weightVar = param.weightVariable ? 
+    const weightVar = param.weightVariable && param.weightVariable !== 'none' ? 
       data.variables.find(v => v.name === param.weightVariable) : null;
 
     if (!estimatingVar) return null;
