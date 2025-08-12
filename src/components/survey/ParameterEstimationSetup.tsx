@@ -36,17 +36,17 @@ export const ParameterEstimationSetup = ({
   const [currentParameter, setCurrentParameter] = useState({
     estimatingParameter: '',
     baseParameter: 'None',
-    aggregationType: '',
+    aggregationType: 'Mean', // Set default to 'Mean' instead of empty string
     weightVariable: 'none'
   });
 
-  const numericVariables = variables.filter(v => v.type === 'numeric');
-  const categoricalVariables = variables.filter(v => v.type === 'categorical');
+  const numericVariables = variables.filter(v => v.type === 'numeric' && v.name && v.name.trim() !== '');
+  const categoricalVariables = variables.filter(v => v.type === 'categorical' && v.name && v.name.trim() !== '');
   const allVariables = [...numericVariables, ...categoricalVariables];
 
   const getRecommendedAggregation = (varName: string) => {
     const variable = variables.find(v => v.name === varName);
-    if (!variable) return '';
+    if (!variable) return 'Mean'; // Default to 'Mean' instead of empty string
     
     // Simple heuristic for recommendations
     if (variable.type === 'numeric') {
@@ -90,7 +90,7 @@ export const ParameterEstimationSetup = ({
     setCurrentParameter({
       estimatingParameter: '',
       baseParameter: 'None',
-      aggregationType: '',
+      aggregationType: 'Mean', // Reset to 'Mean' instead of empty string
       weightVariable: 'none'
     });
 
